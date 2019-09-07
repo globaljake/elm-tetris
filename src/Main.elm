@@ -23,7 +23,7 @@ view : Model -> Document Msg
 view model =
     { title = "Tetris"
     , body =
-        [ Html.div [ Attributes.class "container text-3xl" ]
+        [ Html.div [ Attributes.class "container text-4xl" ]
             [ Html.text "This is going to be tetris"
             ]
         ]
