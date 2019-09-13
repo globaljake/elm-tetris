@@ -1,25 +1,31 @@
 module Main exposing (main)
 
 import Browser exposing (Document)
+import Browser.Events
+import Cell exposing (Cell)
 import Grid exposing (Grid)
 import Html exposing (Html)
 import Html.Attributes as Attributes
+import Html.Events as Events
 import Json.Decode exposing (Value)
-import Square exposing (Square(..))
+import Process
 import Svg exposing (Svg)
 import Svg.Attributes
-import Tetromino exposing (Tetromino)
+import Task
+import Time
 
 
 type alias Model =
-    { gridState : Grid Tetromino
+    { gridState : Grid Cell
     }
 
 
 init : Value -> ( Model, Cmd Msg )
 init flags =
-    ( { gridState = Grid.init ( 10, 20 ) (Tetromino.add Tetromino.Z) }
-    , Cmd.none
+    ( { gridState = Grid.empty ( 10, 20 )
+      }
+    , Process.sleep 1
+        |> Task.perform (\_ -> Spawn)
     )
 
 
@@ -44,7 +50,7 @@ viewRoot model =
         ]
 
 
-viewBoard : Grid Tetromino -> Html Msg
+viewBoard : Grid Cell -> Html Msg
 viewBoard gridState =
     Html.div [ Attributes.class "flex justify-center" ]
         [ Html.div [ Attributes.class "fill-current w-full max-w-xs" ]
@@ -62,13 +68,13 @@ viewBoard gridState =
         ]
 
 
-viewCell : Grid Tetromino -> ( Int, Int ) -> Svg Msg
+viewCell : Grid Cell -> ( Int, Int ) -> Svg Msg
 viewCell gridState ( x, y ) =
     Svg.rect
         [ Svg.Attributes.class
             (case Grid.get ( x, y ) gridState of
-                Just t ->
-                    "fill-current " ++ Tetromino.color t
+                Just cell ->
+                    "fill-current " ++ Cell.color cell
 
                 Nothing ->
                     "fill-current text-gray-300"
@@ -88,14 +94,47 @@ viewCell gridState ( x, y ) =
 
 
 type Msg
-    = Ignored
+    = Spawn
+    | MoveDown
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Ignored ->
-            ( model, Cmd.none )
+        Spawn ->
+            case Grid.batchInsert (Cell.spawn Cell.T) model.gridState of
+                Ok grid ->
+                    ( { model | gridState = grid }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        MoveDown ->
+            case
+                model.gridState
+                    |> Grid.batchUpdate
+                        (Grid.filter (\_ cell -> Cell.isActive cell) model.gridState
+                            |> Grid.toList
+                            |> List.map (\( pos, _ ) -> ( pos, Grid.down pos ))
+                        )
+            of
+                Ok grid ->
+                    ( { model | gridState = grid }, Cmd.none )
+
+                Err err ->
+                    let
+                        _ =
+                            Debug.log "MoveDown" err
+                    in
+                    ( model, Cmd.none )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch
+        [ Time.every 499 (\_ -> MoveDown)
+        , Time.every 5000 (\_ -> Spawn)
+        ]
 
 
 main : Program Value Model Msg
@@ -104,7 +143,7 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         }
 
 
@@ -114,4 +153,4 @@ main =
 
 cellSize : Int
 cellSize =
-    100
+    1

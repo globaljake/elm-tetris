@@ -1,4 +1,4 @@
-module Tetromino exposing (Tetromino(..), add, color)
+module Tetromino exposing (Tetromino(..), color, down, spawn)
 
 
 type Tetromino
@@ -45,8 +45,8 @@ color block =
             "text-orange-400"
 
 
-add : Tetromino -> List ( ( Int, Int ), Tetromino )
-add tetromino =
+spawn : Tetromino -> List ( ( Int, Int ), Tetromino )
+spawn tetromino =
     case tetromino of
         I ->
             [ ( ( 3, 0 ), I )
@@ -96,3 +96,8 @@ add tetromino =
             , ( ( 7, 0 ), L )
             , ( ( 5, 1 ), L )
             ]
+
+
+down : List ( ( Int, Int ), Tetromino ) -> List ( ( Int, Int ), Tetromino )
+down group =
+    List.map (\( ( x, y ), tet ) -> ( ( x, y + 1 ), tet )) group
