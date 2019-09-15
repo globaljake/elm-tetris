@@ -67,6 +67,30 @@ viewBoard model =
                 , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
                 ]
                 (List.map (viewCell model.gridState) (Grid.coordinates model.gridState))
+            , Html.div [ Attributes.class "absolute inset-0 flex flex-col opacity-25 sm:hidden" ]
+                [ Html.div [ Attributes.class "flex flex-1" ]
+                    [ Html.button
+                        [ Attributes.class "h-full w-1/2"
+                        , Events.onClick MoveLeft
+                        ]
+                        [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "←" ]
+                        ]
+                    , Html.button
+                        [ Attributes.class "h-full w-1/2"
+                        , Events.onClick MoveRight
+                        ]
+                        [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "→" ]
+                        ]
+                    ]
+                , Html.div [ Attributes.class "flex h-32" ]
+                    [ Html.button
+                        [ Attributes.class "h-full w-full"
+                        , Events.onClick MoveDown
+                        ]
+                        [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "↓" ]
+                        ]
+                    ]
+                ]
             , if model.gameover then
                 Html.div [ Attributes.class "absolute inset-0 flex flex-col justify-center items-center bg-black text-white" ]
                     [ Html.button

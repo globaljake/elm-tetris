@@ -3,8 +3,12 @@
 a,
 button,
 input {
+  outline: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-appearance: none;
+}
+button:focus {
+  outline: 0;
 }
 
 @tailwind components;
