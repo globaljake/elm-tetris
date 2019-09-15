@@ -46,7 +46,7 @@ view model =
 viewRoot : Model -> Html Msg
 viewRoot model =
     Html.div [ Attributes.class "container text-center" ]
-        [ Html.h1 [ Attributes.class "font-semibold text-xl sm:text-3xl m-6" ]
+        [ Html.h1 [ Attributes.class "font-semibold text-xl sm:text-3xl m-2 sm:m-5" ]
             [ Html.text "This is going to be Tetris"
             ]
         , viewBoard model
@@ -56,7 +56,7 @@ viewRoot model =
 viewBoard : Model -> Html Msg
 viewBoard model =
     Html.div [ Attributes.class "flex justify-center" ]
-        [ Html.div [ Attributes.class "fill-current w-full max-w-xs relative" ]
+        [ Html.div [ Attributes.class "fill-current w-full max-w-xs mx-12 relative" ]
             [ Svg.svg
                 [ Grid.dimentions model.gridState
                     |> (\( x, y ) -> [ 0, 0, x * cellSize, y * cellSize ])
