@@ -7,7 +7,7 @@ cache:
 
 before_deploy:
   - "npm run build"
-  - "echo tetris.jakequattrocchi.com >> dist/CNAME"
+  - "echo tetris.globaljake.com >> dist/CNAME"
 
 deploy:
   provider: pages
