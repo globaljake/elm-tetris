@@ -71,21 +71,21 @@ viewBoard model =
                 [ Html.div [ Attributes.class "flex flex-1" ]
                     [ Html.button
                         [ Attributes.class "h-full w-1/2"
-                        , Events.onClick MoveLeft
+                        , Events.onMouseDown MoveLeft
                         ]
                         [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "←" ]
                         ]
                     , Html.button
                         [ Attributes.class "h-full w-1/2"
-                        , Events.onClick MoveRight
+                        , Events.onMouseDown MoveRight
                         ]
                         [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "→" ]
                         ]
                     ]
-                , Html.div [ Attributes.class "flex h-32" ]
+                , Html.div [ Attributes.class "flex h-24" ]
                     [ Html.button
                         [ Attributes.class "h-full w-full"
-                        , Events.onClick MoveDown
+                        , Events.onMouseDown MoveDown
                         ]
                         [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "↓" ]
                         ]
@@ -94,7 +94,7 @@ viewBoard model =
             , if model.gameover then
                 Html.div [ Attributes.class "absolute inset-0 flex flex-col justify-center items-center bg-black text-white" ]
                     [ Html.button
-                        [ Attributes.class "w-full h-full"
+                        [ Attributes.class "p-10"
                         , Events.onClick Restart
                         ]
                         [ Html.span [ Attributes.class "flex flex-col" ]
