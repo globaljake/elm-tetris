@@ -149,7 +149,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Spawn tetrimino ->
-            case spawnTetrimino tetrimino (inactivateCells model.gridState) of
+            case spawn tetrimino (inactivateCells model.gridState) of
                 Ok grid ->
                     ( { model | gridState = grid }
                     , Cmd.none
@@ -170,7 +170,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                Err err ->
+                Err _ ->
                     ( model, Cmd.none )
 
         MoveRight ->
@@ -180,7 +180,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                Err err ->
+                Err _ ->
                     ( model, Cmd.none )
 
         MoveDown ->
@@ -190,7 +190,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                Err err ->
+                Err _ ->
                     ( { model | gridState = inactivateCells model.gridState }
                     , Random.generate Spawn Tetrimino.random
                     )
@@ -203,17 +203,16 @@ update msg model =
             )
 
 
-spawnTetrimino : Tetrimino -> Grid Cell -> Result String (Grid Cell)
-spawnTetrimino tetrimino grid =
+spawn : Tetrimino -> Grid Cell -> Result String (Grid Cell)
+spawn tetrimino grid =
     let
         positions =
             Cell.spawn tetrimino
+
+        positionsMovedUp =
+            List.map (Tuple.mapFirst Grid.up) positions
     in
     if List.any (\pos -> Grid.member pos grid) (List.map Tuple.first positions) then
-        let
-            positionsMovedUp =
-                List.map (Tuple.mapFirst Grid.up) positions
-        in
         if List.any (\pos -> Grid.member pos grid) (List.map Tuple.first positionsMovedUp) then
             Err "Game Over"
 
@@ -224,8 +223,8 @@ spawnTetrimino tetrimino grid =
         Ok (List.foldl (\( pos, cell ) -> Grid.insert pos cell) grid positions)
 
 
-updateTetriminoPosition : List ( ( Int, Int ), ( Int, Int ) ) -> Grid Cell -> Result String (Grid Cell)
-updateTetriminoPosition positions grid =
+updatePosition : List ( ( Int, Int ), ( Int, Int ) ) -> Grid Cell -> Result String (Grid Cell)
+updatePosition positions grid =
     let
         oldPositions =
             List.map Tuple.first positions
@@ -270,7 +269,7 @@ updateTetriminoPosition positions grid =
 
 moveActiveCells : (( Int, Int ) -> ( Int, Int )) -> Grid Cell -> Result String (Grid Cell)
 moveActiveCells move grid =
-    updateTetriminoPosition
+    updatePosition
         (Grid.filter (\_ cell -> Cell.isActive cell) grid
             |> Grid.keys
             |> List.map (\pos -> ( pos, move pos ))
