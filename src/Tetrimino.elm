@@ -1,7 +1,9 @@
-module Tetromino exposing (Tetromino(..), color, down, spawn)
+module Tetrimino exposing (Tetrimino(..), color, random, spawn)
+
+import Random
 
 
-type Tetromino
+type Tetrimino
     = I
     | O
     | T
@@ -11,18 +13,14 @@ type Tetromino
     | L
 
 
-
--- render
--- moveLeft
--- moveRight
--- moveDown
--- rotate
--- leftmost piece
+random : Random.Generator Tetrimino
+random =
+    Random.uniform I [ O, T, S, Z, J, L ]
 
 
-color : Tetromino -> String
-color block =
-    case block of
+color : Tetrimino -> String
+color tetrimino =
+    case tetrimino of
         I ->
             "text-teal-400"
 
@@ -45,9 +43,9 @@ color block =
             "text-orange-400"
 
 
-spawn : Tetromino -> List ( ( Int, Int ), Tetromino )
-spawn tetromino =
-    case tetromino of
+spawn : Tetrimino -> List ( ( Int, Int ), Tetrimino )
+spawn tetrimino =
+    case tetrimino of
         I ->
             [ ( ( 3, 0 ), I )
             , ( ( 4, 0 ), I )
@@ -98,6 +96,6 @@ spawn tetromino =
             ]
 
 
-down : List ( ( Int, Int ), Tetromino ) -> List ( ( Int, Int ), Tetromino )
+down : List ( ( Int, Int ), Tetrimino ) -> List ( ( Int, Int ), Tetrimino )
 down group =
     List.map (\( ( x, y ), tet ) -> ( ( x, y + 1 ), tet )) group
