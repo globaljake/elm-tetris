@@ -3,6 +3,7 @@ module Main exposing (main)
 import Browser exposing (Document)
 import Browser.Events
 import Cell exposing (Cell)
+import Dict
 import Grid exposing (Grid)
 import Html exposing (Html)
 import Html.Attributes as Attributes
@@ -58,7 +59,7 @@ viewBoard model =
     Html.div [ Attributes.class "flex justify-center" ]
         [ Html.div [ Attributes.class "fill-current w-full max-w-xs mx-12 relative" ]
             [ Svg.svg
-                [ Grid.dimentions model.gridState
+                [ Grid.dimensions model.gridState
                     |> (\( x, y ) -> [ 0, 0, x * cellSize, y * cellSize ])
                     |> List.map String.fromInt
                     |> String.join " "
@@ -191,7 +192,7 @@ update msg model =
                     )
 
                 Err _ ->
-                    ( { model | gridState = inactivateCells model.gridState }
+                    ( { model | gridState = clearLines (inactivateCells model.gridState) }
                     , Random.generate Spawn Tetrimino.random
                     )
 
@@ -275,6 +276,45 @@ moveActiveCells move grid =
             |> List.map (\pos -> ( pos, move pos ))
         )
         grid
+
+
+clearLines : Grid Cell -> Grid Cell
+clearLines grid =
+    let
+        lines : List Int
+        lines =
+            List.foldl
+                (\( x, y ) -> Dict.update y (Just << Maybe.withDefault 1 << Maybe.map ((+) 1)))
+                Dict.empty
+                (Grid.keys grid)
+                |> Dict.toList
+                |> List.filter (\( y, amt ) -> amt == (Tuple.first <| Grid.dimensions grid))
+                |> List.map Tuple.first
+
+        gridAfterClear : Grid Cell
+        gridAfterClear =
+            List.foldl
+                (\lineNumber -> Grid.filter (\pos _ -> Tuple.second pos /= lineNumber))
+                grid
+                lines
+
+        keysAboveClearedLines =
+            Grid.filter
+                (\pos _ -> Tuple.second pos < (List.maximum lines |> Maybe.withDefault 0))
+                gridAfterClear
+                |> Grid.keys
+    in
+    List.foldr
+        (\( x, y ) g ->
+            case updatePosition [ ( ( x, y ), ( x, y + 1 ) ) ] g of
+                Ok newGrid ->
+                    newGrid
+
+                Err _ ->
+                    g
+        )
+        gridAfterClear
+        keysAboveClearedLines
 
 
 inactivateCells : Grid Cell -> Grid Cell

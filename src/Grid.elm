@@ -1,7 +1,7 @@
 module Grid exposing
     ( Grid
     , coordinates
-    , dimentions
+    , dimensions
     , down
     , empty
     , filter
@@ -67,8 +67,8 @@ init ( x, y ) positions =
         }
 
 
-dimentions : Grid a -> ( Int, Int )
-dimentions (Grid { x, y }) =
+dimensions : Grid a -> ( Int, Int )
+dimensions (Grid { x, y }) =
     ( x, y )
 
 
