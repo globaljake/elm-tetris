@@ -20,14 +20,25 @@ import Time
 
 type alias Model =
     { gridState : Grid Cell
-    , gameover : Bool
+    , state : State
     }
+
+
+type State
+    = Playing
+    | Settling
+    | GameOver
+
+
+type Foul
+    = OutOfBounds
+    | CellTaken
 
 
 init : Value -> ( Model, Cmd Msg )
 init flags =
     ( { gridState = Grid.empty ( 10, 20 )
-      , gameover = False
+      , state = Playing
       }
     , Random.generate Spawn Tetrimino.random
     )
@@ -60,7 +71,7 @@ viewBoard model =
         [ Html.div [ Attributes.class "fill-current w-full max-w-xs mx-12 relative" ]
             [ Svg.svg
                 [ Grid.dimensions model.gridState
-                    |> (\( x, y ) -> [ 0, 0, x * cellSize, y * cellSize ])
+                    |> (\( x, y ) -> [ 0, 0, x * Cell.size, y * Cell.size ])
                     |> List.map String.fromInt
                     |> String.join " "
                     |> Svg.Attributes.viewBox
@@ -68,47 +79,8 @@ viewBoard model =
                 , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
                 ]
                 (List.map (viewCell model.gridState) (Grid.coordinates model.gridState))
-            , Html.div [ Attributes.class "absolute inset-0 flex flex-col opacity-25 sm:hidden" ]
-                [ Html.div [ Attributes.class "flex flex-1" ]
-                    [ Html.button
-                        [ Attributes.class "h-full w-1/2"
-                        , Events.onMouseDown MoveLeft
-                        ]
-                        [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "←" ]
-                        ]
-                    , Html.button
-                        [ Attributes.class "h-full w-1/2"
-                        , Events.onMouseDown MoveRight
-                        ]
-                        [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "→" ]
-                        ]
-                    ]
-                , Html.div [ Attributes.class "flex h-24" ]
-                    [ Html.button
-                        [ Attributes.class "h-full w-full"
-                        , Events.onMouseDown MoveDown
-                        ]
-                        [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "↓" ]
-                        ]
-                    ]
-                ]
-            , if model.gameover then
-                Html.div [ Attributes.class "absolute inset-0 flex flex-col justify-center items-center bg-black text-white" ]
-                    [ Html.button
-                        [ Attributes.class "p-10"
-                        , Events.onClick Restart
-                        ]
-                        [ Html.span [ Attributes.class "flex flex-col" ]
-                            [ Html.span [ Attributes.class "text-3xl font-semibold" ]
-                                [ Html.text "Game Over"
-                                ]
-                            , Html.span [] [ Html.text "Restart?" ]
-                            ]
-                        ]
-                    ]
-
-              else
-                Html.text ""
+            , viewMobileControls
+            , viewStateOverlay model.state
             ]
         ]
 
@@ -117,21 +89,73 @@ viewCell : Grid Cell -> ( Int, Int ) -> Svg Msg
 viewCell gridState ( x, y ) =
     Svg.rect
         [ Svg.Attributes.class
-            (case Grid.get ( x, y ) gridState of
-                Just cell ->
-                    "fill-current " ++ Cell.color cell
-
-                Nothing ->
-                    "fill-current text-gray-300"
+            (String.join " "
+                [ "fill-current"
+                , Grid.get ( x, y ) gridState
+                    |> Maybe.map Cell.color
+                    |> Maybe.withDefault "text-gray-300"
+                ]
             )
-        , Svg.Attributes.width (String.fromInt cellSize)
-        , Svg.Attributes.height (String.fromInt cellSize)
-        , Svg.Attributes.strokeWidth (String.fromFloat (0.05 * toFloat cellSize))
+        , Svg.Attributes.width (String.fromInt Cell.size)
+        , Svg.Attributes.height (String.fromInt Cell.size)
+        , Svg.Attributes.strokeWidth (String.fromFloat (0.05 * toFloat Cell.size))
         , Svg.Attributes.stroke "#edf2f7"
-        , Svg.Attributes.x (String.fromInt (x * cellSize))
-        , Svg.Attributes.y (String.fromInt (y * cellSize))
+        , Svg.Attributes.x (String.fromInt (x * Cell.size))
+        , Svg.Attributes.y (String.fromInt (y * Cell.size))
         ]
         []
+
+
+viewMobileControls : Html Msg
+viewMobileControls =
+    Html.div [ Attributes.class "absolute inset-0 flex flex-col opacity-25 sm:hidden" ]
+        [ Html.div [ Attributes.class "flex flex-1" ]
+            [ Html.button
+                [ Attributes.class "h-full w-1/2"
+                , Events.onMouseDown MoveLeft
+                ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "←" ]
+                ]
+            , Html.button
+                [ Attributes.class "h-full w-1/2"
+                , Events.onMouseDown MoveRight
+                ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "→" ]
+                ]
+            ]
+        , Html.div [ Attributes.class "flex h-24" ]
+            [ Html.button
+                [ Attributes.class "h-full w-full"
+                , Events.onMouseDown Advance
+                ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "↓" ]
+                ]
+            ]
+        ]
+
+
+viewStateOverlay : State -> Html Msg
+viewStateOverlay state =
+    case state of
+        GameOver ->
+            Html.div
+                [ Attributes.class "absolute inset-0 flex flex-col justify-center items-center bg-black text-white"
+                ]
+                [ Html.button
+                    [ Attributes.class "p-10"
+                    , Events.onClick Restart
+                    ]
+                    [ Html.span [ Attributes.class "flex flex-col" ]
+                        [ Html.span [ Attributes.class "text-3xl font-semibold" ]
+                            [ Html.text "Game Over"
+                            ]
+                        , Html.span [] [ Html.text "Restart?" ]
+                        ]
+                    ]
+                ]
+
+        _ ->
+            Html.text ""
 
 
 
@@ -142,7 +166,8 @@ type Msg
     = Spawn Tetrimino
     | MoveLeft
     | MoveRight
-    | MoveDown
+    | Advance
+    | SettleBoard Int
     | Restart
 
 
@@ -150,207 +175,230 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Spawn tetrimino ->
-            case spawn tetrimino (inactivateCells model.gridState) of
-                Ok grid ->
-                    ( { model | gridState = grid }
-                    , Cmd.none
-                    )
-
-                Err err ->
-                    ( { model
-                        | gridState = inactivateCells model.gridState
-                        , gameover = True
-                      }
-                    , Cmd.none
-                    )
+            ( spawn tetrimino model, Cmd.none )
 
         MoveLeft ->
-            case moveActiveCells Grid.left model.gridState of
-                Ok grid ->
-                    ( { model | gridState = grid }
-                    , Cmd.none
-                    )
-
-                Err _ ->
-                    ( model, Cmd.none )
+            ( move Grid.left model, Cmd.none )
 
         MoveRight ->
-            case moveActiveCells Grid.right model.gridState of
-                Ok grid ->
-                    ( { model | gridState = grid }
-                    , Cmd.none
-                    )
+            ( move Grid.right model, Cmd.none )
 
-                Err _ ->
-                    ( model, Cmd.none )
+        Advance ->
+            advance model
 
-        MoveDown ->
-            case moveActiveCells Grid.down model.gridState of
-                Ok grid ->
-                    ( { model | gridState = grid }
-                    , Cmd.none
-                    )
-
-                Err _ ->
-                    ( { model | gridState = clearLines (inactivateCells model.gridState) }
-                    , Random.generate Spawn Tetrimino.random
-                    )
+        SettleBoard yPos ->
+            ( { model
+                | gridState = settle yPos model.gridState
+                , state = Playing
+              }
+            , Random.generate Spawn Tetrimino.random
+            )
 
         Restart ->
             ( { gridState = Grid.empty ( 10, 20 )
-              , gameover = False
+              , state = Playing
               }
             , Random.generate Spawn Tetrimino.random
             )
 
 
-spawn : Tetrimino -> Grid Cell -> Result String (Grid Cell)
-spawn tetrimino grid =
-    let
-        positions =
-            Cell.spawn tetrimino
+spawn : Tetrimino -> Model -> Model
+spawn tetrimino model =
+    case spawnHelp 1 (Cell.spawn tetrimino) model.gridState of
+        Ok newGrid ->
+            { model | gridState = newGrid }
 
-        positionsMovedUp =
-            List.map (Tuple.mapFirst Grid.up) positions
+        Err foul ->
+            { model | state = GameOver }
+
+
+spawnHelp : Int -> List ( ( Int, Int ), Cell ) -> Grid Cell -> Result Foul (Grid Cell)
+spawnHelp amount cells grid =
+    case groupInsert cells grid of
+        Ok newGrid ->
+            Ok newGrid
+
+        Err foul ->
+            if amount >= 0 then
+                spawnHelp (amount - 1) (List.map (Tuple.mapFirst Grid.up) cells) grid
+
+            else
+                Err foul
+
+
+move : (( Int, Int ) -> ( Int, Int )) -> Model -> Model
+move f model =
+    case moveHelp f model.gridState of
+        Ok newGrid ->
+            { model | gridState = newGrid }
+
+        Err foul ->
+            model
+
+
+advance : Model -> ( Model, Cmd Msg )
+advance model =
+    case moveHelp Grid.down model.gridState of
+        Ok newGrid ->
+            ( { model | gridState = newGrid }, Cmd.none )
+
+        Err foul ->
+            clearLines model
+
+
+moveHelp : (( Int, Int ) -> ( Int, Int )) -> Grid Cell -> Result Foul (Grid Cell)
+moveHelp f grid =
+    let
+        activePositionMap =
+            Grid.filter (\_ cell -> Cell.isActive cell) grid
+                |> Grid.positions
+                |> List.map (\pos -> ( pos, f pos ))
     in
-    if List.any (\pos -> Grid.member pos grid) (List.map Tuple.first positions) then
-        if List.any (\pos -> Grid.member pos grid) (List.map Tuple.first positionsMovedUp) then
-            Err "Game Over"
-
-        else
-            Ok (List.foldl (\( pos, cell ) -> Grid.insert pos cell) grid positionsMovedUp)
-
-    else
-        Ok (List.foldl (\( pos, cell ) -> Grid.insert pos cell) grid positions)
+    groupUpdate activePositionMap grid
 
 
-updatePosition : List ( ( Int, Int ), ( Int, Int ) ) -> Grid Cell -> Result String (Grid Cell)
-updatePosition positions grid =
+clearLines : Model -> ( Model, Cmd Msg )
+clearLines model =
     let
-        oldPositions =
-            List.map Tuple.first positions
+        ( gridX, _ ) =
+            Grid.dimensions model.gridState
 
-        newPositions =
-            List.map Tuple.second positions
-
-        filteredGrid =
-            Grid.filter (\k _ -> not <| List.member k oldPositions) grid
-
-        updatedGrid =
-            positions
-                |> List.foldl
-                    (\( position, newPosition ) acc ->
-                        case
-                            ( Grid.get position grid, List.member position newPositions )
-                        of
-                            ( Just value, True ) ->
-                                Grid.insert newPosition value acc
-
-                            ( Just value, False ) ->
-                                Grid.remove position acc
-                                    |> Grid.insert newPosition value
-
-                            ( Nothing, _ ) ->
-                                acc
-                    )
-                    grid
-    in
-    if not <| List.all (\pos -> Grid.member pos grid) oldPositions then
-        Err "Update: Not all positions are currently in grid"
-
-    else if List.any (\pos -> Grid.member pos filteredGrid) newPositions then
-        Err "Update: Any of the new positions are taken"
-
-    else if List.any (\pos -> not <| Grid.inBounds pos grid) newPositions then
-        Err "Update: Out of bounds"
-
-    else
-        Ok updatedGrid
-
-
-moveActiveCells : (( Int, Int ) -> ( Int, Int )) -> Grid Cell -> Result String (Grid Cell)
-moveActiveCells move grid =
-    updatePosition
-        (Grid.filter (\_ cell -> Cell.isActive cell) grid
-            |> Grid.keys
-            |> List.map (\pos -> ( pos, move pos ))
-        )
-        grid
-
-
-clearLines : Grid Cell -> Grid Cell
-clearLines grid =
-    let
-        lines : List Int
-        lines =
+        linesToClear =
             List.foldl
-                (\( x, y ) -> Dict.update y (Just << Maybe.withDefault 1 << Maybe.map ((+) 1)))
+                (\( _, y ) -> Dict.update y (\mv -> Just (Maybe.withDefault 0 mv + 1)))
                 Dict.empty
-                (Grid.keys grid)
+                (Grid.positions model.gridState)
                 |> Dict.toList
-                |> List.filter (\( y, amt ) -> amt == (Tuple.first <| Grid.dimensions grid))
+                |> List.filter (\( _, count ) -> count == gridX)
                 |> List.map Tuple.first
 
-        gridAfterClear : Grid Cell
+        lowestClearedLine =
+            Maybe.withDefault 0 (List.maximum linesToClear)
+
         gridAfterClear =
             List.foldl
                 (\lineNumber -> Grid.filter (\pos _ -> Tuple.second pos /= lineNumber))
-                grid
-                lines
-
-        keysAboveClearedLines =
-            Grid.filter
-                (\pos _ -> Tuple.second pos < (List.maximum lines |> Maybe.withDefault 0))
-                gridAfterClear
-                |> Grid.keys
+                model.gridState
+                linesToClear
     in
-    List.foldr
-        (\( x, y ) g ->
-            case updatePosition [ ( ( x, y ), ( x, y + 1 ) ) ] g of
-                Ok newGrid ->
-                    newGrid
-
-                Err _ ->
-                    g
-        )
-        gridAfterClear
-        keysAboveClearedLines
+    ( { model
+        | gridState = Grid.map (\_ -> Cell.inactivate) gridAfterClear
+        , state = Settling
+      }
+    , Process.sleep 150
+        |> Task.perform (\_ -> SettleBoard lowestClearedLine)
+    )
 
 
-inactivateCells : Grid Cell -> Grid Cell
-inactivateCells grid =
-    Grid.filter (\_ cell -> Cell.isActive cell) grid
-        |> Grid.toList
-        |> List.foldl (\( pos, cell ) -> Grid.insert pos (Cell.inactivate cell)) grid
+settle : Int -> Grid Cell -> Grid Cell
+settle yPos grid =
+    let
+        aboveClearedPositionMap =
+            Grid.positions grid
+                |> List.filterMap
+                    (\pos ->
+                        if Tuple.second pos < yPos then
+                            Just ( pos, Grid.down pos )
+
+                        else
+                            Nothing
+                    )
+    in
+    case groupUpdate aboveClearedPositionMap grid of
+        Ok newGrid ->
+            newGrid
+
+        Err _ ->
+            grid
+
+
+groupInsert : List ( ( Int, Int ), Cell ) -> Grid Cell -> Result Foul (Grid Cell)
+groupInsert cells grid =
+    case foulCheck (List.map Tuple.first cells) grid of
+        Just foul ->
+            Err foul
+
+        Nothing ->
+            Ok (List.foldl (\( pos, cell ) -> Grid.insert pos cell) grid cells)
+
+
+groupUpdate : List ( ( Int, Int ), ( Int, Int ) ) -> Grid Cell -> Result Foul (Grid Cell)
+groupUpdate positionMap grid =
+    let
+        ( oldPositions, newPositions ) =
+            List.unzip positionMap
+
+        gridWithoutOld =
+            Grid.filter (\pos _ -> not <| List.member pos oldPositions) grid
+    in
+    case foulCheck newPositions gridWithoutOld of
+        Just foul ->
+            Err foul
+
+        Nothing ->
+            Ok <|
+                (positionMap
+                    |> List.foldl
+                        (\( pos, newPos ) newGrid ->
+                            case
+                                ( Grid.get pos grid, List.member pos newPositions )
+                            of
+                                ( Just cell, True ) ->
+                                    Grid.insert newPos cell newGrid
+
+                                ( Just cell, False ) ->
+                                    Grid.remove pos newGrid
+                                        |> Grid.insert newPos cell
+
+                                ( Nothing, _ ) ->
+                                    newGrid
+                        )
+                        grid
+                )
+
+
+foulCheck : List ( Int, Int ) -> Grid Cell -> Maybe Foul
+foulCheck positions grid =
+    let
+        ( gridX, gridY ) =
+            Grid.dimensions grid
+
+        outOfBounds ( x, y ) =
+            x < 0 || x >= gridX || y < 0 || y >= gridY
+    in
+    if List.any (\pos -> Grid.member pos grid) positions then
+        Just CellTaken
+
+    else if List.any outOfBounds positions then
+        Just OutOfBounds
+
+    else
+        Nothing
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if model.gameover then
-        Sub.none
+    Sub.batch
+        [ Time.every 500 (\_ -> Advance)
+        , Browser.Events.onKeyDown
+            (Decode.field "key" Decode.string
+                |> Decode.andThen
+                    (\key ->
+                        case key of
+                            "ArrowLeft" ->
+                                Decode.succeed MoveLeft
 
-    else
-        Sub.batch
-            [ Time.every 500 (\_ -> MoveDown)
-            , Browser.Events.onKeyDown
-                (Decode.field "key" Decode.string
-                    |> Decode.andThen
-                        (\key ->
-                            case key of
-                                "ArrowLeft" ->
-                                    Decode.succeed MoveLeft
+                            "ArrowRight" ->
+                                Decode.succeed MoveRight
 
-                                "ArrowRight" ->
-                                    Decode.succeed MoveRight
+                            "ArrowDown" ->
+                                Decode.succeed Advance
 
-                                "ArrowDown" ->
-                                    Decode.succeed MoveDown
-
-                                _ ->
-                                    Decode.fail ""
-                        )
-                )
-            ]
+                            _ ->
+                                Decode.fail ""
+                    )
+            )
+        ]
 
 
 main : Program Value Model Msg
@@ -361,12 +409,3 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
-
-
-
--- INTERNAL
-
-
-cellSize : Int
-cellSize =
-    1

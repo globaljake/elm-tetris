@@ -7,12 +7,11 @@ module Grid exposing
     , filter
     , fromKey
     , get
-    , inBounds
-    , init
     , insert
-    , keys
     , left
+    , map
     , member
+    , positions
     , remove
     , right
     , toList
@@ -55,18 +54,6 @@ up ( x, y ) =
     ( x, y - 1 )
 
 
-init : ( Int, Int ) -> List ( ( Int, Int ), a ) -> Grid a
-init ( x, y ) positions =
-    Grid
-        { x = x
-        , y = y
-        , cells =
-            positions
-                |> List.map (Tuple.mapFirst key)
-                |> Dict.fromList
-        }
-
-
 dimensions : Grid a -> ( Int, Int )
 dimensions (Grid { x, y }) =
     ( x, y )
@@ -100,11 +87,6 @@ get position (Grid grid) =
     Dict.get (key position) grid.cells
 
 
-member : ( Int, Int ) -> Grid a -> Bool
-member position (Grid grid) =
-    Dict.member (key position) grid.cells
-
-
 filter : (( Int, Int ) -> v -> Bool) -> Grid v -> Grid v
 filter f (Grid grid) =
     Grid { grid | cells = Dict.filter (\k v -> f (fromKey k) v) grid.cells }
@@ -120,13 +102,18 @@ remove position (Grid grid) =
     Grid { grid | cells = Dict.remove (key position) grid.cells }
 
 
-inBounds : ( Int, Int ) -> Grid a -> Bool
-inBounds ( x, y ) (Grid grid) =
-    x >= 0 && x < grid.x && y >= 0 && y < grid.y
+member : ( Int, Int ) -> Grid a -> Bool
+member position (Grid grid) =
+    Dict.member (key position) grid.cells
 
 
-keys : Grid a -> List ( Int, Int )
-keys (Grid grid) =
+map : (( Int, Int ) -> a -> b) -> Grid a -> Grid b
+map f (Grid grid) =
+    Grid { x = grid.x, y = grid.y, cells = Dict.map (\k v -> f (fromKey k) v) grid.cells }
+
+
+positions : Grid a -> List ( Int, Int )
+positions (Grid grid) =
     grid.cells
         |> Dict.keys
         |> List.map fromKey

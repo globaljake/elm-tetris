@@ -1,4 +1,4 @@
-module Cell exposing (Cell, color, inactivate, isActive, spawn)
+module Cell exposing (Cell, color, inactivate, isActive, size, spawn)
 
 import Tetrimino exposing (Tetrimino)
 
@@ -30,3 +30,8 @@ spawn tetrimino =
 isActive : Cell -> Bool
 isActive (Cell { active }) =
     active
+
+
+size : Int
+size =
+    1
