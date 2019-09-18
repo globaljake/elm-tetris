@@ -69,12 +69,12 @@ key : ( Int, Int ) -> String
 key ( x, y ) =
     [ x, y ]
         |> List.map String.fromInt
-        |> String.join "-"
+        |> String.join ","
 
 
 fromKey : String -> ( Int, Int )
 fromKey k =
-    case List.map (Maybe.withDefault 0 << String.toInt) (String.split "-" k) of
+    case List.map (Maybe.withDefault 0 << String.toInt) (String.split "," k) of
         [ x, y ] ->
             ( x, y )
 
