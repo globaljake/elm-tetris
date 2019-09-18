@@ -120,19 +120,19 @@ viewMobileControls =
             ]
         , Html.div [ Attributes.class "flex h-32" ]
             [ Html.button
-                [ Attributes.class "h-full w-1/3"
+                [ Attributes.class "h-full w-2/5"
                 , Events.onMouseDown MoveLeft
                 ]
                 [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👈" ]
                 ]
             , Html.button
-                [ Attributes.class "h-full w-1/3"
+                [ Attributes.class "h-full w-1/5"
                 , Events.onMouseDown Advance
                 ]
                 [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👇" ]
                 ]
             , Html.button
-                [ Attributes.class "h-full w-1/3"
+                [ Attributes.class "h-full w-2/5"
                 , Events.onMouseDown MoveRight
                 ]
                 [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👉" ]
@@ -185,6 +185,7 @@ type Msg
     | MoveRight
     | Rotate
     | Advance
+    | Place
     | SettleBoard (List Int)
     | Restart
 
@@ -206,6 +207,9 @@ update msg model =
 
         Advance ->
             advance model
+
+        Place ->
+            place model
 
         SettleBoard linesToClear ->
             ( { model
@@ -238,7 +242,7 @@ spawn tetrimino model =
 spawnHelp : Int -> List ( ( Int, Int ), Cell ) -> Grid Cell -> Result Foul (Grid Cell)
 spawnHelp count cells grid =
     case groupInsert cells grid of
-        ( Just CellTaken, newGrid ) ->
+        ( Just CellTaken, _ ) ->
             if count > 0 then
                 spawnHelp (count - 1) (List.map (Tuple.mapFirst Grid.up) cells) grid
 
@@ -257,6 +261,31 @@ move f model =
 
         Err foul ->
             model
+
+
+place : Model -> ( Model, Cmd Msg )
+place model =
+    let
+        noActive =
+            Grid.filter (\_ -> not << Cell.isSettled) model.gridState
+                |> Grid.positions
+                |> List.isEmpty
+    in
+    if noActive then
+        ( model, Cmd.none )
+
+    else
+        clearLines { model | gridState = placeHelp model.gridState }
+
+
+placeHelp : Grid Cell -> Grid Cell
+placeHelp grid =
+    case moveHelp Grid.down grid of
+        Ok newGrid ->
+            placeHelp newGrid
+
+        Err foul ->
+            grid
 
 
 advance : Model -> ( Model, Cmd Msg )
@@ -311,7 +340,7 @@ clearLines model =
         | gridState = Grid.map (\_ -> Cell.settle) gridAfterClear
         , state = Settling
       }
-    , Process.sleep 150
+    , Process.sleep 200
         |> Task.perform (\_ -> SettleBoard linesToClear)
     )
 
@@ -439,8 +468,12 @@ foulCheck positions grid =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
+    let
+        gameSpeed =
+            700 - (model.lines * 4)
+    in
     Sub.batch
-        [ Time.every 500 (\_ -> Advance)
+        [ Time.every (toFloat gameSpeed) (\_ -> Advance)
         , Browser.Events.onKeyDown
             (Decode.field "key" Decode.string
                 |> Decode.andThen
@@ -457,6 +490,9 @@ subscriptions model =
 
                             "ArrowDown" ->
                                 Decode.succeed Advance
+
+                            " " ->
+                                Decode.succeed Place
 
                             _ ->
                                 Decode.fail ""
