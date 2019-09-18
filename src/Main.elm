@@ -127,9 +127,9 @@ viewMobileControls =
                 ]
             , Html.button
                 [ Attributes.class "h-full w-1/5"
-                , Events.onMouseDown Advance
+                , Events.onMouseDown Place
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👇" ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👌" ]
                 ]
             , Html.button
                 [ Attributes.class "h-full w-2/5"
