@@ -1,4 +1,4 @@
-module Tetrimino exposing (Tetrimino(..), color, random, spawn)
+module Tetrimino exposing (Tetrimino(..), color, random, rotateAround, spawn)
 
 import Random
 
@@ -43,59 +43,59 @@ color tetrimino =
             "text-orange-400"
 
 
-spawn : Tetrimino -> List ( ( Int, Int ), Tetrimino )
+spawn : Tetrimino -> List ( ( Int, Int ), ( Tetrimino, Bool ) )
 spawn tetrimino =
     case tetrimino of
         I ->
-            [ ( ( 3, 0 ), I )
-            , ( ( 4, 0 ), I )
-            , ( ( 5, 0 ), I )
-            , ( ( 6, 0 ), I )
+            [ ( ( 3, 0 ), ( I, False ) )
+            , ( ( 4, 0 ), ( I, True ) )
+            , ( ( 5, 0 ), ( I, False ) )
+            , ( ( 6, 0 ), ( I, False ) )
             ]
 
         O ->
-            [ ( ( 4, 0 ), O )
-            , ( ( 5, 0 ), O )
-            , ( ( 4, 1 ), O )
-            , ( ( 5, 1 ), O )
+            [ ( ( 4, 0 ), ( O, False ) )
+            , ( ( 5, 0 ), ( O, False ) )
+            , ( ( 4, 1 ), ( O, False ) )
+            , ( ( 5, 1 ), ( O, False ) )
             ]
 
         T ->
-            [ ( ( 4, 0 ), T )
-            , ( ( 5, 0 ), T )
-            , ( ( 6, 0 ), T )
-            , ( ( 5, 1 ), T )
+            [ ( ( 4, 0 ), ( T, False ) )
+            , ( ( 5, 0 ), ( T, True ) )
+            , ( ( 6, 0 ), ( T, False ) )
+            , ( ( 5, 1 ), ( T, False ) )
             ]
 
         S ->
-            [ ( ( 5, 0 ), S )
-            , ( ( 6, 0 ), S )
-            , ( ( 4, 1 ), S )
-            , ( ( 5, 1 ), S )
+            [ ( ( 5, 0 ), ( S, False ) )
+            , ( ( 6, 0 ), ( S, False ) )
+            , ( ( 4, 1 ), ( S, False ) )
+            , ( ( 5, 1 ), ( S, True ) )
             ]
 
         Z ->
-            [ ( ( 4, 0 ), Z )
-            , ( ( 5, 0 ), Z )
-            , ( ( 5, 1 ), Z )
-            , ( ( 6, 1 ), Z )
+            [ ( ( 4, 0 ), ( Z, False ) )
+            , ( ( 5, 0 ), ( Z, False ) )
+            , ( ( 5, 1 ), ( Z, True ) )
+            , ( ( 6, 1 ), ( Z, False ) )
             ]
 
         J ->
-            [ ( ( 3, 0 ), J )
-            , ( ( 4, 0 ), J )
-            , ( ( 5, 0 ), J )
-            , ( ( 5, 1 ), J )
+            [ ( ( 3, 0 ), ( J, False ) )
+            , ( ( 4, 0 ), ( J, True ) )
+            , ( ( 5, 0 ), ( J, False ) )
+            , ( ( 5, 1 ), ( J, False ) )
             ]
 
         L ->
-            [ ( ( 5, 0 ), L )
-            , ( ( 6, 0 ), L )
-            , ( ( 7, 0 ), L )
-            , ( ( 5, 1 ), L )
+            [ ( ( 5, 0 ), ( L, False ) )
+            , ( ( 6, 0 ), ( L, True ) )
+            , ( ( 7, 0 ), ( L, False ) )
+            , ( ( 5, 1 ), ( L, False ) )
             ]
 
 
-down : List ( ( Int, Int ), Tetrimino ) -> List ( ( Int, Int ), Tetrimino )
-down group =
-    List.map (\( ( x, y ), tet ) -> ( ( x, y + 1 ), tet )) group
+rotateAround : ( Int, Int ) -> ( Int, Int ) -> ( Int, Int )
+rotateAround ( x, y ) ( cx, cy ) =
+    ( ((y - cy) * -1) + cx, (x - cx) + cy )

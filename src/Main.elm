@@ -166,8 +166,9 @@ type Msg
     = Spawn Tetrimino
     | MoveLeft
     | MoveRight
+    | MoveUp
     | Advance
-    | SettleBoard Int
+    | SettleBoard (List Int)
     | Restart
 
 
@@ -183,12 +184,15 @@ update msg model =
         MoveRight ->
             ( move Grid.right model, Cmd.none )
 
+        MoveUp ->
+            ( rotate model, Cmd.none )
+
         Advance ->
             advance model
 
-        SettleBoard yPos ->
+        SettleBoard linesToClear ->
             ( { model
-                | gridState = settle yPos model.gridState
+                | gridState = List.foldl settle model.gridState linesToClear
                 , state = Playing
               }
             , Random.generate Spawn Tetrimino.random
@@ -219,7 +223,7 @@ spawnHelp amount cells grid =
             Ok newGrid
 
         Err foul ->
-            if amount >= 0 then
+            if amount > 0 then
                 spawnHelp (amount - 1) (List.map (Tuple.mapFirst Grid.up) cells) grid
 
             else
@@ -250,7 +254,7 @@ moveHelp : (( Int, Int ) -> ( Int, Int )) -> Grid Cell -> Result Foul (Grid Cell
 moveHelp f grid =
     let
         activePositionMap =
-            Grid.filter (\_ cell -> Cell.isActive cell) grid
+            Grid.filter (\_ cell -> not <| Cell.isSettled cell) grid
                 |> Grid.positions
                 |> List.map (\pos -> ( pos, f pos ))
     in
@@ -271,9 +275,7 @@ clearLines model =
                 |> Dict.toList
                 |> List.filter (\( _, count ) -> count == gridX)
                 |> List.map Tuple.first
-
-        lowestClearedLine =
-            Maybe.withDefault 0 (List.maximum linesToClear)
+                |> List.sort
 
         gridAfterClear =
             List.foldl
@@ -282,11 +284,11 @@ clearLines model =
                 linesToClear
     in
     ( { model
-        | gridState = Grid.map (\_ -> Cell.inactivate) gridAfterClear
+        | gridState = Grid.map (\_ -> Cell.settle) gridAfterClear
         , state = Settling
       }
     , Process.sleep 150
-        |> Task.perform (\_ -> SettleBoard lowestClearedLine)
+        |> Task.perform (\_ -> SettleBoard linesToClear)
     )
 
 
@@ -310,6 +312,50 @@ settle yPos grid =
 
         Err _ ->
             grid
+
+
+rotate : Model -> Model
+rotate model =
+    case rotateHelp model.gridState of
+        Ok newGrid ->
+            { model | gridState = newGrid }
+
+        Err _ ->
+            model
+
+
+rotateHelp : Grid Cell -> Result Foul (Grid Cell)
+rotateHelp grid =
+    let
+        activeCells =
+            Grid.filter (\_ cell -> not <| Cell.isSettled cell) grid
+
+        center =
+            Grid.filter (\_ cell -> Cell.isCenter cell) activeCells
+                |> Grid.positions
+                |> List.head
+
+        rotatePositionMap =
+            Grid.filter (\_ cell -> not <| Cell.isSettled cell) grid
+                |> Grid.positions
+                |> List.map
+                    (\pos ->
+                        ( pos
+                        , case center of
+                            Just cPos ->
+                                Tetrimino.rotateAround pos cPos
+
+                            Nothing ->
+                                pos
+                        )
+                    )
+    in
+    case groupUpdate rotatePositionMap grid of
+        Ok newGrid ->
+            Ok newGrid
+
+        Err foul ->
+            Err foul
 
 
 groupInsert : List ( ( Int, Int ), Cell ) -> Grid Cell -> Result Foul (Grid Cell)
@@ -390,6 +436,9 @@ subscriptions model =
 
                             "ArrowRight" ->
                                 Decode.succeed MoveRight
+
+                            "ArrowUp" ->
+                                Decode.succeed MoveUp
 
                             "ArrowDown" ->
                                 Decode.succeed Advance
