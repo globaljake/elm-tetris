@@ -59,29 +59,59 @@ view model =
 
 viewRoot : Model -> Html Msg
 viewRoot model =
-    Html.div [ Attributes.class "container text-center h-full" ]
-        [ Html.h1 [ Attributes.class "font-semibold text-xl sm:text-3xl m-2 sm:m-5" ]
-            [ Html.text "Elm Tetris"
-            ]
-        , viewBoard model
+    Html.div [ Attributes.class "text-center h-full" ]
+        [ viewBoard model
         ]
 
 
 viewBoard : Model -> Html Msg
 viewBoard model =
-    Html.div [ Attributes.class "flex justify-center font-mono" ]
-        [ Html.div [ Attributes.class "fill-current w-full max-w-xs mx-12 relative" ]
-            [ Svg.svg
-                [ Grid.dimensions model.gridState
-                    |> (\( x, y ) -> [ 0, 0, x * Cell.size, y * Cell.size ])
-                    |> List.map String.fromInt
-                    |> String.join " "
-                    |> Svg.Attributes.viewBox
-                , Svg.Attributes.width "100%"
-                , Svg.Attributes.preserveAspectRatio "xMidYMid meet"
+    Html.div [ Attributes.class "flex flex-col h-full items-center font-mono" ]
+        [ Html.div [ Attributes.class "flex flex-col h-full w-full max-h-screen sm:max-w-xl sm:shadow-xl relative" ]
+            [ Html.div [ Attributes.class "flex p-4" ]
+                [ Html.text <| "lines - " ++ String.fromInt model.lines
                 ]
-                (List.map (viewCell model.gridState) (Grid.coordinates model.gridState))
-            , viewMobileControls
+            , Html.div [ Attributes.class "flex flex-1 h-0" ]
+                [ Svg.svg
+                    [ Grid.dimensions model.gridState
+                        |> (\( x, y ) -> [ 0, 0, x * Cell.size, y * Cell.size ])
+                        |> List.map String.fromInt
+                        |> String.join " "
+                        |> Svg.Attributes.viewBox
+                    , Svg.Attributes.width "100%"
+                    , Svg.Attributes.height "100%"
+                    , Svg.Attributes.preserveAspectRatio "xMidYMid meet"
+                    ]
+                    (List.map (viewCell model.gridState) (Grid.coordinates model.gridState))
+                ]
+            , Html.div [ Attributes.class "flex h-24" ]
+                [ Html.button
+                    [ Attributes.class "h-full w-1/3"
+                    , Events.onMouseDown MoveLeft
+                    ]
+                    [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                        [ Html.text "👈"
+                        ]
+                    ]
+                , Html.button
+                    [ Attributes.class "h-full w-1/3"
+                    , Events.onMouseDown Place
+                    ]
+                    [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                        [ Html.text "👌"
+                        ]
+                    ]
+                , Html.button
+                    [ Attributes.class "h-full w-1/3"
+                    , Events.onMouseDown MoveRight
+                    ]
+                    [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                        [ Html.text "👉"
+                        ]
+                    ]
+                ]
+
+            -- , viewMobileControls
             , viewOverlay model
             ]
         ]
@@ -123,19 +153,25 @@ viewMobileControls =
                 [ Attributes.class "h-full w-2/5"
                 , Events.onMouseDown MoveLeft
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👈" ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                    [ Html.text "👈"
+                    ]
                 ]
             , Html.button
                 [ Attributes.class "h-full w-1/5"
                 , Events.onMouseDown Place
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👌" ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                    [ Html.text "👌"
+                    ]
                 ]
             , Html.button
                 [ Attributes.class "h-full w-2/5"
                 , Events.onMouseDown MoveRight
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ] [ Html.text "👉" ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                    [ Html.text "👉"
+                    ]
                 ]
             ]
         ]
@@ -155,7 +191,14 @@ viewOverlay model =
                     [ Html.span [ Attributes.class "flex flex-col" ]
                         [ Html.span [ Attributes.class "text-xl font-medium" ]
                             [ Html.text <|
-                                String.join " " [ String.fromInt model.lines, "Lines" ]
+                                String.join " "
+                                    [ String.fromInt model.lines
+                                    , if model.lines == 1 then
+                                        "Line"
+
+                                      else
+                                        "Lines"
+                                    ]
                             ]
                         , Html.span [ Attributes.class "text-3xl font-medium" ]
                             [ Html.text "Game Over"
@@ -166,13 +209,7 @@ viewOverlay model =
                 ]
 
         _ ->
-            Html.div
-                [ Attributes.class "absolute top-0 left-0"
-                ]
-                [ Html.span [ Attributes.class "leading-none text-2xl flex p-4" ]
-                    [ Html.text (String.fromInt model.lines)
-                    ]
-                ]
+            Html.text ""
 
 
 
@@ -253,6 +290,12 @@ spawnHelp count cells grid =
             Ok newGrid
 
 
+activeCells : Grid Cell -> List ( ( Int, Int ), Cell )
+activeCells grid =
+    Grid.filter (\_ -> not << Cell.isSettled) grid
+        |> Grid.toList
+
+
 move : (( Int, Int ) -> ( Int, Int )) -> Model -> Model
 move f model =
     case moveHelp f model.gridState of
@@ -265,13 +308,7 @@ move f model =
 
 place : Model -> ( Model, Cmd Msg )
 place model =
-    let
-        noActive =
-            Grid.filter (\_ -> not << Cell.isSettled) model.gridState
-                |> Grid.positions
-                |> List.isEmpty
-    in
-    if noActive then
+    if List.isEmpty (activeCells model.gridState) then
         ( model, Cmd.none )
 
     else
@@ -302,9 +339,8 @@ moveHelp : (( Int, Int ) -> ( Int, Int )) -> Grid Cell -> Result Foul (Grid Cell
 moveHelp f grid =
     let
         activePositionMap =
-            Grid.filter (\_ -> not << Cell.isSettled) grid
-                |> Grid.positions
-                |> List.map (\pos -> ( pos, f pos ))
+            activeCells grid
+                |> List.map (\( pos, _ ) -> ( pos, f pos ))
     in
     case groupUpdate activePositionMap grid of
         ( Nothing, newGrid ) ->
@@ -380,16 +416,12 @@ rotate model =
 rotateHelp : Grid Cell -> Result Foul (Grid Cell)
 rotateHelp grid =
     let
-        activeCells =
-            Grid.filter (\_ -> not << Cell.isSettled) grid
-                |> Grid.toList
-
         center =
-            List.filter (Cell.isCenter << Tuple.second) activeCells
+            List.filter (Cell.isCenter << Tuple.second) (activeCells grid)
                 |> List.head
 
         rotatePositionMap =
-            activeCells
+            activeCells grid
                 |> List.map
                     (\( pos, _ ) ->
                         ( pos
