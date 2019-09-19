@@ -22,6 +22,7 @@ type alias Model =
     { gridState : Grid Cell
     , state : State
     , lines : Int
+    , mode : Mode
     }
 
 
@@ -36,11 +37,18 @@ type Foul
     | CellTaken
 
 
+type Mode
+    = Normal
+    | Medium
+    | Hard
+
+
 init : Value -> ( Model, Cmd Msg )
 init flags =
     ( { gridState = Grid.empty ( 10, 20 )
       , state = Playing
       , lines = 0
+      , mode = Normal
       }
     , Random.generate Spawn Tetrimino.random
     )
@@ -59,61 +67,30 @@ view model =
 
 viewRoot : Model -> Html Msg
 viewRoot model =
-    Html.div [ Attributes.class "text-center h-full" ]
+    Html.div [ Attributes.class "flex flex-col fixed inset-0 h-full items-center font-mono" ]
         [ viewBoard model
         ]
 
 
 viewBoard : Model -> Html Msg
 viewBoard model =
-    Html.div [ Attributes.class "flex flex-col h-full items-center font-mono" ]
-        [ Html.div [ Attributes.class "flex flex-col h-full w-full max-h-screen sm:max-w-xl sm:shadow-xl relative" ]
-            [ Html.div [ Attributes.class "flex p-4" ]
-                [ Html.text <| "lines - " ++ String.fromInt model.lines
+    Html.div [ Attributes.class "flex flex-col h-full w-full max-h-screen sm:max-w-xl relative" ]
+        [ viewHeader model
+        , Html.div [ Attributes.class "flex flex-1 h-0" ]
+            [ Svg.svg
+                [ Grid.dimensions model.gridState
+                    |> (\( x, y ) -> [ 0, 0, x * Cell.size, y * Cell.size ])
+                    |> List.map String.fromInt
+                    |> String.join " "
+                    |> Svg.Attributes.viewBox
+                , Svg.Attributes.width "100%"
+                , Svg.Attributes.height "100%"
+                , Svg.Attributes.preserveAspectRatio "xMidYMid meet"
                 ]
-            , Html.div [ Attributes.class "flex flex-1 h-0" ]
-                [ Svg.svg
-                    [ Grid.dimensions model.gridState
-                        |> (\( x, y ) -> [ 0, 0, x * Cell.size, y * Cell.size ])
-                        |> List.map String.fromInt
-                        |> String.join " "
-                        |> Svg.Attributes.viewBox
-                    , Svg.Attributes.width "100%"
-                    , Svg.Attributes.height "100%"
-                    , Svg.Attributes.preserveAspectRatio "xMidYMid meet"
-                    ]
-                    (List.map (viewCell model.gridState) (Grid.coordinates model.gridState))
-                ]
-            , Html.div [ Attributes.class "flex h-24" ]
-                [ Html.button
-                    [ Attributes.class "h-full w-1/3"
-                    , Events.onMouseDown MoveLeft
-                    ]
-                    [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                        [ Html.text "👈"
-                        ]
-                    ]
-                , Html.button
-                    [ Attributes.class "h-full w-1/3"
-                    , Events.onMouseDown Place
-                    ]
-                    [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                        [ Html.text "👌"
-                        ]
-                    ]
-                , Html.button
-                    [ Attributes.class "h-full w-1/3"
-                    , Events.onMouseDown MoveRight
-                    ]
-                    [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                        [ Html.text "👉"
-                        ]
-                    ]
-                ]
-
-            -- , viewMobileControls
-            , viewOverlay model
+                (List.map (viewCell model.gridState) (Grid.coordinates model.gridState))
             ]
+        , viewControls
+        , viewOverlay model
         ]
 
 
@@ -138,40 +115,81 @@ viewCell gridState ( x, y ) =
         []
 
 
-viewMobileControls : Html Msg
-viewMobileControls =
-    Html.div [ Attributes.class "absolute inset-0 flex flex-col opacity-75 sm:hidden" ]
-        [ Html.div [ Attributes.class "flex flex-1" ]
+viewHeader : Model -> Html Msg
+viewHeader model =
+    Html.div [ Attributes.class "flex items-center justify-between p-4" ]
+        [ Html.span [] [ Html.text ("lines - " ++ String.fromInt model.lines) ]
+        , Html.div [ Attributes.class "" ]
             [ Html.button
-                [ Attributes.class "h-full w-full"
-                , Events.onMouseDown Rotate
+                [ Attributes.classList
+                    [ ( "px-2 leading-snug rounded", True )
+                    , ( "bg-yellow-400", model.mode == Normal )
+                    ]
+                , Events.onMouseDown (SelectMode Normal)
                 ]
-                []
+                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl pointer-events-none" ]
+                    [ Html.text "🙂"
+                    ]
+                ]
+            , Html.button
+                [ Attributes.classList
+                    [ ( "px-2 leading-snug rounded", True )
+                    , ( "bg-teal-400", model.mode == Medium )
+                    ]
+                , Events.onMouseDown (SelectMode Medium)
+                ]
+                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl pointer-events-none" ]
+                    [ Html.text "😎"
+                    ]
+                ]
+            , Html.button
+                [ Attributes.classList
+                    [ ( "px-2 leading-snug rounded", True )
+                    , ( "bg-red-400", model.mode == Hard )
+                    ]
+                , Events.onMouseDown (SelectMode Hard)
+                ]
+                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl pointer-events-none" ]
+                    [ Html.text "\u{1F92F}"
+                    ]
+                ]
             ]
-        , Html.div [ Attributes.class "flex h-32" ]
-            [ Html.button
-                [ Attributes.class "h-full w-2/5"
-                , Events.onMouseDown MoveLeft
+        ]
+
+
+viewControls : Html Msg
+viewControls =
+    Html.div [ Attributes.class "flex h-24" ]
+        [ Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.onMouseDown MoveLeft
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                [ Html.text "👈"
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                    [ Html.text "👈"
-                    ]
+            ]
+        , Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.onMouseDown Place
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                [ Html.text "👌"
                 ]
-            , Html.button
-                [ Attributes.class "h-full w-1/5"
-                , Events.onMouseDown Place
+            ]
+        , Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.onMouseDown Rotate
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                [ Html.text "🔄"
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                    [ Html.text "👌"
-                    ]
-                ]
-            , Html.button
-                [ Attributes.class "h-full w-2/5"
-                , Events.onMouseDown MoveRight
-                ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                    [ Html.text "👉"
-                    ]
+            ]
+        , Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.onMouseDown MoveRight
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                [ Html.text "👉"
                 ]
             ]
         ]
@@ -217,7 +235,8 @@ viewOverlay model =
 
 
 type Msg
-    = Spawn Tetrimino
+    = SelectMode Mode
+    | Spawn Tetrimino
     | MoveLeft
     | MoveRight
     | Rotate
@@ -230,6 +249,9 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SelectMode mode ->
+            ( { model | mode = mode }, Cmd.none )
+
         Spawn tetrimino ->
             ( spawn tetrimino model, Cmd.none )
 
@@ -261,6 +283,7 @@ update msg model =
             ( { gridState = Grid.empty ( 10, 20 )
               , state = Playing
               , lines = 0
+              , mode = model.mode
               }
             , Random.generate Spawn Tetrimino.random
             )
@@ -502,7 +525,15 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     let
         gameSpeed =
-            700 - (model.lines * 4)
+            case model.mode of
+                Normal ->
+                    600 - (model.lines * 4)
+
+                Medium ->
+                    300 - (model.lines * 2)
+
+                Hard ->
+                    100 - model.lines
     in
     Sub.batch
         [ Time.every (toFloat gameSpeed) (\_ -> Advance)

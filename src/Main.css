@@ -4,6 +4,11 @@ html,
 body {
   height: 100%;
 }
+
+body {
+  overscroll-behavior-y: none;
+}
+
 a,
 button,
 input {
