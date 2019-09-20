@@ -527,7 +527,7 @@ subscriptions model =
         gameSpeed =
             case model.mode of
                 Normal ->
-                    600 - (model.lines * 4)
+                    800 - (model.lines * 4)
 
                 Medium ->
                     300 - (model.lines * 2)
