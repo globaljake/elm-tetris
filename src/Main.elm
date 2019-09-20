@@ -76,7 +76,7 @@ viewBoard : Model -> Html Msg
 viewBoard model =
     Html.div [ Attributes.class "flex flex-col h-full w-full max-h-screen sm:max-w-xl relative" ]
         [ viewHeader model
-        , Html.div [ Attributes.class "flex flex-1 h-0" ]
+        , Html.div [ Attributes.class "flex flex-1 min-h-0" ]
             [ Svg.svg
                 [ Grid.dimensions model.gridState
                     |> (\( x, y ) -> [ 0, 0, x * Cell.size, y * Cell.size ])
@@ -170,18 +170,18 @@ viewControls =
             ]
         , Html.button
             [ Attributes.class "h-full w-1/4"
-            , Events.onMouseDown Place
-            ]
-            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                [ Html.text "👌"
-                ]
-            ]
-        , Html.button
-            [ Attributes.class "h-full w-1/4"
             , Events.onMouseDown Rotate
             ]
             [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
                 [ Html.text "🔄"
+                ]
+            ]
+        , Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.onMouseDown Place
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
+                [ Html.text "👌"
                 ]
             ]
         , Html.button
