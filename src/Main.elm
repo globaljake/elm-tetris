@@ -11,6 +11,7 @@ import Html.Events as Events
 import Json.Decode as Decode exposing (Value)
 import Process
 import Random
+import Storage exposing (Storage)
 import Svg exposing (Svg)
 import Svg.Attributes
 import Task
@@ -20,6 +21,7 @@ import Time
 
 type alias Model =
     { gridState : Grid Cell
+    , storage : Maybe Storage
     , state : State
     , lines : Int
     , mode : Mode
@@ -46,6 +48,10 @@ type Mode
 init : Value -> ( Model, Cmd Msg )
 init flags =
     ( { gridState = Grid.empty ( 10, 20 )
+      , storage =
+            Decode.decodeValue (Decode.field "storage" Decode.string) flags
+                |> Result.andThen (Decode.decodeString Storage.decoder)
+                |> Result.toMaybe
       , state = Playing
       , lines = 0
       , mode = Normal
@@ -67,7 +73,7 @@ view model =
 
 viewRoot : Model -> Html Msg
 viewRoot model =
-    Html.div [ Attributes.class "flex flex-col fixed inset-0 h-full items-center font-mono" ]
+    Html.div [ Attributes.class "flex flex-col fixed inset-0 h-full items-center select-none font-mono" ]
         [ viewBoard model
         ]
 
@@ -118,7 +124,17 @@ viewCell gridState ( x, y ) =
 viewHeader : Model -> Html Msg
 viewHeader model =
     Html.div [ Attributes.class "flex items-center justify-between p-4" ]
-        [ Html.span [] [ Html.text ("lines - " ++ String.fromInt model.lines) ]
+        [ Html.span []
+            [ Html.text ("lines - " ++ String.fromInt model.lines)
+            , case model.storage of
+                Just storage ->
+                    Html.span [ Attributes.class "ml-4 text-gray-500" ]
+                        [ Html.text <| "(best - " ++ String.fromInt (Storage.highScore storage) ++ ")"
+                        ]
+
+                Nothing ->
+                    Html.text ""
+            ]
         , Html.div [ Attributes.class "" ]
             [ Html.button
                 [ Attributes.classList
@@ -127,7 +143,7 @@ viewHeader model =
                     ]
                 , Events.onMouseDown (SelectMode Normal)
                 ]
-                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl pointer-events-none" ]
+                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl" ]
                     [ Html.text "🙂"
                     ]
                 ]
@@ -138,7 +154,7 @@ viewHeader model =
                     ]
                 , Events.onMouseDown (SelectMode Medium)
                 ]
-                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl pointer-events-none" ]
+                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl" ]
                     [ Html.text "😎"
                     ]
                 ]
@@ -149,7 +165,7 @@ viewHeader model =
                     ]
                 , Events.onMouseDown (SelectMode Hard)
                 ]
-                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl pointer-events-none" ]
+                [ Html.span [ Attributes.class "mt-1 flex flex-col text-3xl" ]
                     [ Html.text "\u{1F92F}"
                     ]
                 ]
@@ -159,37 +175,39 @@ viewHeader model =
 
 viewControls : Html Msg
 viewControls =
-    Html.div [ Attributes.class "flex h-24" ]
-        [ Html.button
-            [ Attributes.class "h-full w-1/4"
-            , Events.onMouseDown MoveLeft
-            ]
-            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                [ Html.text "👈"
+    Html.div [ Attributes.class "h-32" ]
+        [ Html.div [ Attributes.class "flex h-24" ]
+            [ Html.button
+                [ Attributes.class "h-full w-1/4"
+                , Events.onMouseDown MoveLeft
                 ]
-            ]
-        , Html.button
-            [ Attributes.class "h-full w-1/4"
-            , Events.onMouseDown Rotate
-            ]
-            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                [ Html.text "🔄"
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                    [ Html.text "👈"
+                    ]
                 ]
-            ]
-        , Html.button
-            [ Attributes.class "h-full w-1/4"
-            , Events.onMouseDown Place
-            ]
-            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                [ Html.text "👌"
+            , Html.button
+                [ Attributes.class "h-full w-1/4"
+                , Events.onMouseDown Rotate
                 ]
-            ]
-        , Html.button
-            [ Attributes.class "h-full w-1/4"
-            , Events.onMouseDown MoveRight
-            ]
-            [ Html.span [ Attributes.class "flex flex-col text-3xl pointer-events-none" ]
-                [ Html.text "👉"
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                    [ Html.text "🔄"
+                    ]
+                ]
+            , Html.button
+                [ Attributes.class "h-full w-1/4"
+                , Events.onMouseDown Advance
+                ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                    [ Html.text "👇"
+                    ]
+                ]
+            , Html.button
+                [ Attributes.class "h-full w-1/4"
+                , Events.onMouseDown MoveRight
+                ]
+                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                    [ Html.text "👉"
+                    ]
                 ]
             ]
         ]
@@ -197,6 +215,10 @@ viewControls =
 
 viewOverlay : Model -> Html Msg
 viewOverlay model =
+    let
+        isNewBest =
+            model.lines > Maybe.withDefault 0 (Maybe.map Storage.highScore model.storage)
+    in
     case model.state of
         GameOver ->
             Html.div
@@ -210,7 +232,12 @@ viewOverlay model =
                         [ Html.span [ Attributes.class "text-xl font-medium" ]
                             [ Html.text <|
                                 String.join " "
-                                    [ String.fromInt model.lines
+                                    [ if isNewBest then
+                                        "New Best - "
+
+                                      else
+                                        ""
+                                    , String.fromInt model.lines
                                     , if model.lines == 1 then
                                         "Line"
 
@@ -235,7 +262,8 @@ viewOverlay model =
 
 
 type Msg
-    = SelectMode Mode
+    = GotStorage (Maybe Storage)
+    | SelectMode Mode
     | Spawn Tetrimino
     | MoveLeft
     | MoveRight
@@ -249,6 +277,9 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        GotStorage storage ->
+            ( { model | storage = storage }, Cmd.none )
+
         SelectMode mode ->
             ( { model | mode = mode }, Cmd.none )
 
@@ -280,12 +311,19 @@ update msg model =
             )
 
         Restart ->
-            ( { gridState = Grid.empty ( 10, 20 )
-              , state = Playing
-              , lines = 0
-              , mode = model.mode
+            ( { model
+                | gridState = Grid.empty ( 10, 20 )
+                , state = Playing
+                , lines = 0
               }
-            , Random.generate Spawn Tetrimino.random
+            , Cmd.batch
+                [ Random.generate Spawn Tetrimino.random
+                , if model.lines > 0 then
+                    Storage.storeHighScore model.lines
+
+                  else
+                    Cmd.none
+                ]
             )
 
 
@@ -537,6 +575,7 @@ subscriptions model =
     in
     Sub.batch
         [ Time.every (toFloat gameSpeed) (\_ -> Advance)
+        , Storage.changes GotStorage
         , Browser.Events.onKeyDown
             (Decode.field "key" Decode.string
                 |> Decode.andThen
