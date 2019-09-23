@@ -132,13 +132,31 @@ viewCell gridState ( x, y ) =
 
 viewHeader : Model -> Html Msg
 viewHeader model =
+    let
+        rank hs =
+            if hs < 10 then
+                "👍"
+
+            else if hs < 50 then
+                "⭐️"
+
+            else if hs < 100 then
+                "🔥"
+
+            else
+                "🏆"
+    in
     Html.div [ Attributes.class "flex items-center justify-between p-4" ]
         [ Html.span []
             [ Html.text ("lines - " ++ String.fromInt model.lines)
             , case model.storage of
                 Just storage ->
-                    Html.span [ Attributes.class "ml-4 text-gray-500" ]
-                        [ Html.text <| "(best - " ++ String.fromInt (Storage.highScore storage) ++ ")"
+                    Html.span [ Attributes.class "ml-4 text-gray-700 opacity-75" ]
+                        [ Html.text <|
+                            "("
+                                ++ rank (Storage.highScore storage)
+                                ++ String.fromInt (Storage.highScore storage)
+                                ++ ")"
                         ]
 
                 Nothing ->
@@ -184,45 +202,43 @@ viewHeader model =
 
 viewControls : Html Msg
 viewControls =
-    Html.div [ Attributes.class "h-32" ]
-        [ Html.div [ Attributes.class "flex h-24" ]
-            [ Html.button
-                [ Attributes.class "h-full w-1/4"
-                , Events.on "pointerdown" (Decode.succeed MoveLeft)
-                , Events.on "pointerup" (Decode.succeed CancelControl)
-                , Events.on "pointerout" (Decode.succeed CancelControl)
+    Html.div [ Attributes.class "flex h-24" ]
+        [ Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.on "pointerdown" (Decode.succeed <| SetControl Left)
+            , Events.on "pointerup" (Decode.succeed <| CancelControl Left)
+            , Events.on "pointerout" (Decode.succeed <| CancelControl Left)
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                [ Html.text "👈"
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
-                    [ Html.text "👈"
-                    ]
+            ]
+        , Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.on "pointerdown" (Decode.succeed Rotate)
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                [ Html.text "🔄"
                 ]
-            , Html.button
-                [ Attributes.class "h-full w-1/4"
-                , Events.onMouseDown Rotate
+            ]
+        , Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.on "pointerdown" (Decode.succeed <| SetControl Down)
+            , Events.on "pointerup" (Decode.succeed <| CancelControl Down)
+            , Events.on "pointerout" (Decode.succeed <| CancelControl Down)
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                [ Html.text "👇"
                 ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
-                    [ Html.text "🔄"
-                    ]
-                ]
-            , Html.button
-                [ Attributes.class "h-full w-1/4"
-                , Events.on "pointerdown" (Decode.succeed MoveDown)
-                , Events.on "pointerup" (Decode.succeed CancelControl)
-                , Events.on "pointerout" (Decode.succeed CancelControl)
-                ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
-                    [ Html.text "👇"
-                    ]
-                ]
-            , Html.button
-                [ Attributes.class "h-full w-1/4"
-                , Events.on "pointerdown" (Decode.succeed MoveRight)
-                , Events.on "pointerup" (Decode.succeed CancelControl)
-                , Events.on "pointerout" (Decode.succeed CancelControl)
-                ]
-                [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
-                    [ Html.text "👉"
-                    ]
+            ]
+        , Html.button
+            [ Attributes.class "h-full w-1/4"
+            , Events.on "pointerdown" (Decode.succeed <| SetControl Right)
+            , Events.on "pointerup" (Decode.succeed <| CancelControl Right)
+            , Events.on "pointerout" (Decode.succeed <| CancelControl Right)
+            ]
+            [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
+                [ Html.text "👉"
                 ]
             ]
         ]
@@ -235,16 +251,16 @@ overlayControls =
         ]
         [ Html.button
             [ Attributes.class "flex flex-1 h-full"
-            , Events.on "pointerdown" (Decode.succeed MoveLeft)
-            , Events.on "pointerup" (Decode.succeed CancelControl)
-            , Events.on "pointerout" (Decode.succeed CancelControl)
+            , Events.on "pointerdown" (Decode.succeed <| SetControl Left)
+            , Events.on "pointerup" (Decode.succeed <| CancelControl Left)
+            , Events.on "pointerout" (Decode.succeed <| CancelControl Left)
             ]
             []
         , Html.button
             [ Attributes.class "flex flex-1 h-full"
-            , Events.on "pointerdown" (Decode.succeed MoveRight)
-            , Events.on "pointerup" (Decode.succeed CancelControl)
-            , Events.on "pointerout" (Decode.succeed CancelControl)
+            , Events.on "pointerdown" (Decode.succeed <| SetControl Right)
+            , Events.on "pointerup" (Decode.succeed <| CancelControl Right)
+            , Events.on "pointerout" (Decode.succeed <| CancelControl Right)
             ]
             []
         ]
@@ -302,12 +318,11 @@ type Msg
     = GotStorage (Maybe Storage)
     | SelectMode Mode
     | Spawn Tetrimino
-    | MoveLeft
-    | MoveRight
-    | MoveDown
+    | SetControl Control
+    | CancelControl Control
+    | Move Control
     | Rotate
     | Advance
-    | CancelControl
     | Place
     | SettleBoard (List Int)
     | Restart
@@ -325,23 +340,26 @@ update msg model =
         Spawn tetrimino ->
             ( spawn tetrimino model, Cmd.none )
 
-        MoveLeft ->
-            ( move Left model, Cmd.none )
+        SetControl control ->
+            ( move { model | control = Just control } control, Cmd.none )
 
-        MoveRight ->
-            ( move Right model, Cmd.none )
+        CancelControl control ->
+            ( if Just control == model.control then
+                { model | control = Nothing }
 
-        MoveDown ->
-            ( move Down model, Cmd.none )
+              else
+                model
+            , Cmd.none
+            )
+
+        Move control ->
+            ( move model control, Cmd.none )
 
         Rotate ->
             ( rotate model, Cmd.none )
 
         Advance ->
             advance model
-
-        CancelControl ->
-            ( { model | control = Nothing }, Cmd.none )
 
         Place ->
             place model
@@ -402,11 +420,11 @@ activeCells grid =
         |> Grid.toList
 
 
-move : Control -> Model -> Model
-move control model =
+move : Model -> Control -> Model
+move model control =
     case moveHelp control model.gridState of
         Ok newGrid ->
-            { model | gridState = newGrid, control = Just control }
+            { model | gridState = newGrid }
 
         Err foul ->
             model
@@ -632,14 +650,8 @@ subscriptions model =
     Sub.batch
         [ Time.every (toFloat gameSpeed) (\_ -> Advance)
         , case model.control of
-            Just Left ->
-                Time.every 100 (\_ -> MoveLeft)
-
-            Just Right ->
-                Time.every 100 (\_ -> MoveRight)
-
-            Just Down ->
-                Time.every 100 (\_ -> Advance)
+            Just control ->
+                Time.every 100 (\_ -> Move control)
 
             Nothing ->
                 Sub.none
@@ -650,16 +662,16 @@ subscriptions model =
                     (\key ->
                         case key of
                             "ArrowLeft" ->
-                                Decode.succeed MoveLeft
+                                Decode.succeed (Move Left)
 
                             "ArrowRight" ->
-                                Decode.succeed MoveRight
+                                Decode.succeed (Move Right)
 
                             "ArrowUp" ->
                                 Decode.succeed Rotate
 
                             "ArrowDown" ->
-                                Decode.succeed MoveDown
+                                Decode.succeed (Move Down)
 
                             " " ->
                                 Decode.succeed Place

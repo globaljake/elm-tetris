@@ -1,5 +1,8 @@
 @tailwind base;
 
+html {
+  touch-action: manipulation;
+}
 html,
 body {
   height: 100%;
@@ -15,7 +18,6 @@ input {
   outline: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-appearance: none;
-  touch-action: manipulation;
 }
 button:focus {
   outline: 0;
