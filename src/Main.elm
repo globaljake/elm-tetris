@@ -25,6 +25,7 @@ type alias Model =
     , state : State
     , lines : Int
     , mode : Mode
+    , control : Maybe Control
     }
 
 
@@ -45,6 +46,12 @@ type Mode
     | Hard
 
 
+type Control
+    = Left
+    | Right
+    | Down
+
+
 init : Value -> ( Model, Cmd Msg )
 init flags =
     ( { gridState = Grid.empty ( 10, 20 )
@@ -55,6 +62,7 @@ init flags =
       , state = Playing
       , lines = 0
       , mode = Normal
+      , control = Nothing
       }
     , Random.generate Spawn Tetrimino.random
     )
@@ -82,7 +90,7 @@ viewBoard : Model -> Html Msg
 viewBoard model =
     Html.div [ Attributes.class "flex flex-col h-full w-full max-h-screen sm:max-w-xl relative" ]
         [ viewHeader model
-        , Html.div [ Attributes.class "flex flex-1 min-h-0" ]
+        , Html.div [ Attributes.class "relative flex flex-1 min-h-0" ]
             [ Svg.svg
                 [ Grid.dimensions model.gridState
                     |> (\( x, y ) -> [ 0, 0, x * Cell.size, y * Cell.size ])
@@ -94,6 +102,7 @@ viewBoard model =
                 , Svg.Attributes.preserveAspectRatio "xMidYMid meet"
                 ]
                 (List.map (viewCell model.gridState) (Grid.coordinates model.gridState))
+            , overlayControls
             ]
         , viewControls
         , viewOverlay model
@@ -179,7 +188,9 @@ viewControls =
         [ Html.div [ Attributes.class "flex h-24" ]
             [ Html.button
                 [ Attributes.class "h-full w-1/4"
-                , Events.onMouseDown MoveLeft
+                , Events.on "pointerdown" (Decode.succeed MoveLeft)
+                , Events.on "pointerup" (Decode.succeed CancelControl)
+                , Events.on "pointerout" (Decode.succeed CancelControl)
                 ]
                 [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
                     [ Html.text "👈"
@@ -195,7 +206,9 @@ viewControls =
                 ]
             , Html.button
                 [ Attributes.class "h-full w-1/4"
-                , Events.onMouseDown Advance
+                , Events.on "pointerdown" (Decode.succeed MoveDown)
+                , Events.on "pointerup" (Decode.succeed CancelControl)
+                , Events.on "pointerout" (Decode.succeed CancelControl)
                 ]
                 [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
                     [ Html.text "👇"
@@ -203,13 +216,37 @@ viewControls =
                 ]
             , Html.button
                 [ Attributes.class "h-full w-1/4"
-                , Events.onMouseDown MoveRight
+                , Events.on "pointerdown" (Decode.succeed MoveRight)
+                , Events.on "pointerup" (Decode.succeed CancelControl)
+                , Events.on "pointerout" (Decode.succeed CancelControl)
                 ]
                 [ Html.span [ Attributes.class "flex flex-col text-3xl" ]
                     [ Html.text "👉"
                     ]
                 ]
             ]
+        ]
+
+
+overlayControls : Html Msg
+overlayControls =
+    Html.div
+        [ Attributes.class "absolute inset-0 flex"
+        ]
+        [ Html.button
+            [ Attributes.class "flex flex-1 h-full"
+            , Events.on "pointerdown" (Decode.succeed MoveLeft)
+            , Events.on "pointerup" (Decode.succeed CancelControl)
+            , Events.on "pointerout" (Decode.succeed CancelControl)
+            ]
+            []
+        , Html.button
+            [ Attributes.class "flex flex-1 h-full"
+            , Events.on "pointerdown" (Decode.succeed MoveRight)
+            , Events.on "pointerup" (Decode.succeed CancelControl)
+            , Events.on "pointerout" (Decode.succeed CancelControl)
+            ]
+            []
         ]
 
 
@@ -267,8 +304,10 @@ type Msg
     | Spawn Tetrimino
     | MoveLeft
     | MoveRight
+    | MoveDown
     | Rotate
     | Advance
+    | CancelControl
     | Place
     | SettleBoard (List Int)
     | Restart
@@ -287,16 +326,22 @@ update msg model =
             ( spawn tetrimino model, Cmd.none )
 
         MoveLeft ->
-            ( move Grid.left model, Cmd.none )
+            ( move Left model, Cmd.none )
 
         MoveRight ->
-            ( move Grid.right model, Cmd.none )
+            ( move Right model, Cmd.none )
+
+        MoveDown ->
+            ( move Down model, Cmd.none )
 
         Rotate ->
             ( rotate model, Cmd.none )
 
         Advance ->
             advance model
+
+        CancelControl ->
+            ( { model | control = Nothing }, Cmd.none )
 
         Place ->
             place model
@@ -357,11 +402,11 @@ activeCells grid =
         |> Grid.toList
 
 
-move : (( Int, Int ) -> ( Int, Int )) -> Model -> Model
-move f model =
-    case moveHelp f model.gridState of
+move : Control -> Model -> Model
+move control model =
+    case moveHelp control model.gridState of
         Ok newGrid ->
-            { model | gridState = newGrid }
+            { model | gridState = newGrid, control = Just control }
 
         Err foul ->
             model
@@ -378,7 +423,7 @@ place model =
 
 placeHelp : Grid Cell -> Grid Cell
 placeHelp grid =
-    case moveHelp Grid.down grid of
+    case moveHelp Down grid of
         Ok newGrid ->
             placeHelp newGrid
 
@@ -388,7 +433,7 @@ placeHelp grid =
 
 advance : Model -> ( Model, Cmd Msg )
 advance model =
-    case moveHelp Grid.down model.gridState of
+    case moveHelp Down model.gridState of
         Ok newGrid ->
             ( { model | gridState = newGrid }, Cmd.none )
 
@@ -396,12 +441,23 @@ advance model =
             clearLines model
 
 
-moveHelp : (( Int, Int ) -> ( Int, Int )) -> Grid Cell -> Result Foul (Grid Cell)
-moveHelp f grid =
+moveHelp : Control -> Grid Cell -> Result Foul (Grid Cell)
+moveHelp control grid =
     let
         activePositionMap =
             activeCells grid
-                |> List.map (\( pos, _ ) -> ( pos, f pos ))
+                |> List.map
+                    (\( pos, _ ) ->
+                        case control of
+                            Left ->
+                                ( pos, Grid.left pos )
+
+                            Right ->
+                                ( pos, Grid.right pos )
+
+                            Down ->
+                                ( pos, Grid.down pos )
+                    )
     in
     case groupUpdate activePositionMap grid of
         ( Nothing, newGrid ) ->
@@ -575,6 +631,18 @@ subscriptions model =
     in
     Sub.batch
         [ Time.every (toFloat gameSpeed) (\_ -> Advance)
+        , case model.control of
+            Just Left ->
+                Time.every 100 (\_ -> MoveLeft)
+
+            Just Right ->
+                Time.every 100 (\_ -> MoveRight)
+
+            Just Down ->
+                Time.every 100 (\_ -> Advance)
+
+            Nothing ->
+                Sub.none
         , Storage.changes GotStorage
         , Browser.Events.onKeyDown
             (Decode.field "key" Decode.string
@@ -591,7 +659,7 @@ subscriptions model =
                                 Decode.succeed Rotate
 
                             "ArrowDown" ->
-                                Decode.succeed Advance
+                                Decode.succeed MoveDown
 
                             " " ->
                                 Decode.succeed Place
